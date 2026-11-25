@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>交易详情图片编辑器（演示版）</title>
+<style>
+:root{--bg:#f3f5f8;--panel:#fff;--ink:#202124;--muted:#8a8d91;--line:#e8e9eb;--blue:#3267c8}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:"Microsoft YaHei",Arial,sans-serif;color:var(--ink)}
+header{height:60px;background:#fff;border-bottom:1px solid #e9eaec;display:flex;align-items:center;justify-content:space-between;padding:0 24px}
+header strong{font-size:17px}header span{font-size:12px;color:#777}
+.app{display:grid;grid-template-columns:340px minmax(0,1fr);gap:18px;padding:18px;max-width:1500px;margin:auto}
+.panel,.stage{background:#fff;border:1px solid #e7e9ed;border-radius:12px;box-shadow:0 2px 10px #17243a0a}
+.panel{padding:18px;height:calc(100vh - 96px);overflow:auto}.panel h2{font-size:16px;margin:0 0 14px}
+.group{padding-bottom:16px;margin-bottom:16px;border-bottom:1px solid #eff0f2}
+.field{margin:12px 0}.field label{display:block;font-size:12px;color:#62666d;margin-bottom:6px}
+input,textarea,select{width:100%;border:1px solid #dfe2e7;border-radius:7px;padding:10px 11px;font:14px inherit;outline:none;background:#fff}
+input:focus,textarea:focus{border-color:#6e94dc;box-shadow:0 0 0 3px #3267c814}
+textarea{resize:vertical;min-height:56px}
+.row{display:flex;gap:8px}.row>*{flex:1}
+button{border:0;border-radius:7px;padding:10px 12px;font-weight:600;cursor:pointer;font-size:13px}
+.primary{background:#3267c8;color:white}.secondary{background:#eef2f8;color:#34527f}.danger{background:#fff0f0;color:#b33}
+button:hover{filter:brightness(.97)}.hint{font-size:11px;color:#8a8e96;line-height:1.6;margin-top:7px}
+.drop{border:1.5px dashed #b8c4d6;border-radius:9px;padding:16px;text-align:center;background:#fafcff;color:#586b88;font-size:12px;cursor:pointer}
+.drop.drag{background:#eef4ff;border-color:#3267c8}.drop input{display:none}
+.stage{padding:20px;display:flex;flex-direction:column;min-height:calc(100vh - 96px)}
+.stagebar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}.stagebar b{font-size:15px}.stagebar small{color:#888}
+.previewWrap{flex:1;display:flex;align-items:flex-start;justify-content:center;overflow:auto;background:#f6f7f9;border-radius:9px;padding:22px}
+#preview{width:min(100%,480px);height:auto;background:#fff;box-shadow:0 3px 20px #00000012}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.note{font-size:11px;color:#888;line-height:1.6;margin-top:12px}
+@media(max-width:850px){.app{grid-template-columns:1fr}.panel{height:auto}.stage{min-height:650px}.previewWrap{padding:10px}}
+</style>
+</head>
+<body>
+<header><strong>交易详情图片编辑器</strong><span>纯前端 · 本地处理 · 演示用途</span></header>
+<div class="app">
+<aside class="panel">
+  <div class="group">
+    <h2>① 导入图片</h2>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept="image/*">
+      <div style="font-size:22px;margin-bottom:5px">＋</div>
+      <b>点击选择图片，或拖拽图片到这里</b>
+      <div class="hint">支持 PNG / JPG / WEBP。也可以直接使用下方自动生成的演示版式。</div>
+    </label>
+    <div class="row" style="margin-top:9px">
+      <button class="secondary" id="useTemplate">使用空白演示模板</button>
+      <button class="secondary" id="removeImage">移除导入图片</button>
+    </div>
+  </div>
+  <div class="group">
+    <h2>② 编辑标注内容</h2>
+    <div class="field"><label>金额（演示数据）</label><input id="amount" value="-00.00"></div>
+    <div class="field"><label>交易说明 / 商户名称</label><textarea id="merchant">扫二维码付款-给</textarea></div>
+    <div class="field"><label>当前状态</label><input id="status" value="支付成功"></div>
+    <div class="field"><label>收款方备注</label><input id="remark" value="二维码收款"></div>
+    <div class="field"><label>支付方式</label><input id="method" value="零钱"></div>
+    <div class="field"><label>转账时间</label><input id="time" value=""></div>
+    <div class="field">
+      <label>演示编号（32位数字，可手动修改）</label>
+      <textarea id="number" maxlength="32" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:8px">
+        <button class="secondary" type="button" id="generateNumber">重新随机生成</button>
+      </div>
+      <div class="hint">前10位固定为 1000107301；第11–18位为当天日期；最后14位随机生成。也可直接手动编辑全部数字。</div>
+    </div>
+    <div class="field"><label>底部说明</label><input id="footer" value="本服务由财付通提供"></div>
+  </div>
+  <div class="group">
+    <h2>③ 版式设置</h2>
+    <div class="row">
+      <div class="field"><label>画布宽度</label><select id="canvasWidth"><option value="928">928 px（参考图比例）</option><option value="750">750 px</option><option value="1080">1080 px</option></select></div>
+      <div class="field"><label>字体大小</label><select id="fontScale"><option value="1">标准</option><option value="0.9">稍小</option><option value="1.1">稍大</option></select></div>
+    </div>
+    <div class="field"><label><input type="checkbox" id="showWatermark" checked style="width:auto;margin-right:7px">显示「演示样例｜非真实交易」水印</label></div>
+  </div>
+  <div class="hint">提示：导入图片用于本地预览和参考。为避免误导，导出图片始终保留演示标识。</div>
+</aside>
+<main class="stage">
+  <div class="stagebar"><b>实时预览</b><small>修改左侧内容后自动刷新</small></div>
+  <div class="previewWrap"><canvas id="preview" width="928" height="1625"></canvas></div>
+  <div class="actions">
+    <button class="primary" id="download">导出 PNG 图片</button>
+    <button class="secondary" id="reset">恢复默认内容</button>
+    <button class="secondary" id="clear">清空导入图片</button>
+  </div>
+  <div class="note">导出为 PNG 格式。图片仅在当前浏览器中处理，不会上传至服务器。</div>
+</main>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const canvas=$('preview'),ctx=canvas.getContext('2d');
+let imported=null, sourceName='';
+const fields=['amount','merchant','status','remark','method','time','number','footer','canvasWidth','fontScale','showWatermark'];
+
+// 获取当前日期和时间
+function getCurrentTime() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hour = String(now.getHours()).padStart(2, '0');
+  const minute = String(now.getMinutes()).padStart(2, '0');
+  const second = String(now.getSeconds()).padStart(2, '0');
+  return `${year}年${month}月${day}日 ${hour}:${minute}:${second}`;
+}
+
+// 页面每次打开时自动设置当前时间
+$('time').value = getCurrentTime();
+
+// 生成32位演示编号：前10位固定 + 当天日期8位 + 随机14位
+function generateDemoNumber(){
+  const prefix='1000107301';
+  const now=new Date();
+  const date=String(now.getFullYear())+
+    String(now.getMonth()+1).padStart(2,'0')+
+    String(now.getDate()).padStart(2,'0');
+  let randomPart='';
+  for(let i=0;i<14;i++) randomPart+=Math.floor(Math.random()*10);
+  $('number').value=prefix+date+randomPart;
+  draw();
+}
+
+function wrapText(text,maxWidth,font){
+  ctx.font=font;let lines=[],paragraphs=String(text??'').split('\n');
+  for(const p of paragraphs){let line='';for(const ch of p){if(ctx.measureText(line+ch).width>maxWidth&&line){lines.push(line);line=ch}else line+=ch}lines.push(line)}
+  return lines;
+}
+
+function draw(){
+ const W=+$('canvasWidth').value,H=Math.round(W*1.75),s=W/928,fs=+$('fontScale').value;
+ canvas.width=W;canvas.height=H;canvas.style.width='min(100%,480px)';canvas.style.height='auto';
+
+ // 页面底色（浅灰）
+ ctx.fillStyle='#f3f3f3';ctx.fillRect(0,0,W,H);
+
+ // ===== 统一白色卡片：上半部分交易信息 + 下半部分交易服务，同处一个白底框 =====
+ const cardTop=22*s, cardBottom=H-180*s;
+ ctx.fillStyle='#fff';
+ ctx.fillRect(0,cardTop,W,cardBottom-cardTop);
+
+ // Optional imported image as a dimmed reference layer, cropped to canvas
+ if(imported){
+   ctx.save();ctx.globalAlpha=.13;
+   const scale=Math.max(W/imported.width,H/imported.height),iw=imported.width*scale,ih=imported.height*scale;
+   ctx.drawImage(imported,(W-iw)/2,(H-ih)/2,iw,ih);ctx.restore();
+ }
+
+ const font=(n,weight=400)=>`${weight} ${n*s*fs}px "Microsoft YaHei",Arial,sans-serif`;
+
+ // ===== 上半部分：交易信息 =====
+    // 顶部金额显示 大字体 + 正方形小数点
+    const amountText = String($('amount').value).trim();
+    const amountFontSize = 70 * s * fs;
+
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#1a1a1a';
+    ctx.font = `580 ${amountFontSize}px "Segoe UI","Microsoft YaHei",Arial,sans-serif`;
+
+    // 拆分整数部分和小数部分
+    const decimalIndex = amountText.indexOf('.');
+
+    if (decimalIndex !== -1) {
+        const integerPart = amountText.substring(0, decimalIndex);
+        const decimalPart = amountText.substring(decimalIndex + 1);
+
+        const integerWidth = ctx.measureText(integerPart).width;
+        const dotWidth = ctx.measureText('.').width;
+        const decimalWidth = ctx.measureText(decimalPart).width;
+
+        // 保留普通小数点的文字排版宽度
+        const totalWidth = integerWidth + dotWidth + decimalWidth;
+
+        // 整体水平居中
+        const startX = 464 * s - totalWidth / 2;
+        const baseY = 160 * s;
+
+        // 绘制整数部分
+        ctx.fillText(integerPart, startX, baseY);
+
+        // 绘制正方形小数点
+        const squareSize = amountFontSize * 0.09;
+        const squareX = startX + integerWidth +
+            (dotWidth - squareSize) / 2;
+        const squareY = baseY - amountFontSize * 0.18;
+
+        ctx.fillRect(
+            squareX,
+            squareY,
+            squareSize,
+            squareSize
+        );
+
+        // 绘制小数部分
+        ctx.fillText(
+            decimalPart,
+            startX + integerWidth + dotWidth,
+            baseY
+        );
+
+    } else {
+        // 没有小数点时，正常居中显示
+        ctx.textAlign = 'center';
+        ctx.fillText(amountText, 464 * s, 160 * s);
+    }
+    //扫-给 字体以及位置。
+    ctx.font = font(36, 400);
+    ctx.fillStyle = '#202124';
+    ctx.textAlign = 'center';
+
+    const desc = wrapText(
+        $('merchant').value,
+        760 * s,
+        font(36, 400)
+    );
+
+    let dy = 230 * s;
+
+    // 每一行都以画布中心为基准
+    desc.slice(0, 2).forEach(line => {
+        ctx.fillText(line, W / 2, dy);
+        dy += 44 * s;
+    });
+
+ ctx.textAlign='left';ctx.strokeStyle='#e6e6e6';ctx.lineWidth=1*s;ctx.beginPath();ctx.moveTo(80*s,315*s);ctx.lineTo(850*s,315*s);ctx.stroke();
+
+ const rows=[
+  ['当前状态',$('status').value],['备注',$('remark').value],['方式1',$('method').value],
+  ['时间',$('time').value],['单号',$('number').value]
+ ];
+ let y=415*s;
+ rows.forEach((r,i)=>{
+   ctx.font=font(30);ctx.fillStyle='#8b8b8b';ctx.fillText(r[0],80*s,y);
+   ctx.fillStyle='#202124';ctx.font=font(31);
+   const lines=wrapText(r[1],550*s,font(31));
+   lines.forEach((line,j)=>ctx.fillText(line,295*s,y+j*40*s));
+   y+=i===4?95*s:70*s;
+ });
+
+ // 上下两部分之间的浅色分隔条（与参考图一致，不改变白色卡片底色）
+ const bandTop=1170*s, bandHeight=24*s;
+ ctx.fillStyle='#f3f3f3';
+ ctx.fillRect(0,bandTop,W,bandHeight);
+
+ // ===== 下半部分：交易服务（与上半部分同处白色背景框）=====
+ // 交易服务标题
+ ctx.fillStyle='#202124';
+ ctx.font=font(34);
+ ctx.textAlign='left';
+ ctx.fillText('交易服务', 80*s, 1265*s);
+
+ // 分割线
+ ctx.strokeStyle='#ededed';
+ ctx.lineWidth=1*s;
+ ctx.beginPath();
+ ctx.moveTo(80*s,1315*s);
+ ctx.lineTo(850*s,1315*s);
+ ctx.stroke();
+
+ // 同一行：图标 + 文字，图标 + 文字
+ ctx.save();
+ const iconColor = '#64748b';
+ const baseY = 1380*s;
+ ctx.strokeStyle = iconColor;
+ ctx.fillStyle = iconColor;
+ ctx.lineWidth = 2.5*s;
+ ctx.lineCap = 'round';
+ ctx.lineJoin = 'round';
+ ctx.textAlign = 'left';
+ ctx.font = font(27);
+
+ // ========== 左侧：对订单有疑惑 圆圈问号 ==========
+ const x1 = 80*s;
+ const iconSize = 20*s;
+ const iconCenterY = baseY - 7*s;
+ ctx.beginPath();
+ ctx.arc(x1 + iconSize / 2, iconCenterY, iconSize / 2, 0, Math.PI * 2);
+ ctx.stroke();
+ ctx.font = `${14*s}px Arial`;
+ ctx.textAlign = 'center';
+ ctx.fillText('?', x1 + iconSize / 2, iconCenterY + 5*s);
+ ctx.textAlign = 'left';
+ ctx.font = font(27);
+ ctx.fillText('对订单有疑惑', x1 + iconSize + 10*s, baseY);
+
+ // ========== 右侧：发起群收款 文档勾选框 ==========
+ const x2 = 480*s;
+ const docTopY = iconCenterY - iconSize / 2;
+ ctx.strokeRect(x2, docTopY, iconSize, iconSize);
+ ctx.beginPath();
+ ctx.moveTo(x2 + 4*s, docTopY + 5*s);
+ ctx.lineTo(x2 + iconSize - 4*s, docTopY + 5*s);
+ ctx.moveTo(x2 + 4*s, docTopY + 10*s);
+ ctx.lineTo(x2 + iconSize / 2, docTopY + 10*s);
+ ctx.moveTo(x2 + 4*s, docTopY + 14*s);
+ ctx.lineTo(x2 + 8*s, docTopY + 18*s);
+ ctx.lineTo(x2 + 16*s, docTopY + 8*s);
+ ctx.stroke();
+ ctx.fillText('发起群收款', x2 + iconSize + 10*s, baseY);
+ ctx.restore();
+
+ ctx.fillStyle = '#a0a0a0';
+ ctx.font = font(22);
+ ctx.textAlign = 'center';
+ ctx.fillText($('footer').value, 464*s, 1550*s);
+
+ // ===== 演示水印（导出时保留，不可移除）=====
+ if ($('showWatermark').checked) {
+   // 中央斜向水印
+   ctx.save();
+   ctx.translate(W / 2, H / 2);
+   ctx.rotate(-Math.PI / 7);
+   ctx.font = `700 ${Math.round(62*s)}px "Microsoft YaHei",Arial`;
+   ctx.textAlign = 'center';
+   ctx.fillStyle = 'rgba(190,35,35,.14)';
+   ctx.fillText('演示样例 · 非真实交易', 0, 0);
+   ctx.restore();
+
+   // 顶部水印条
+   ctx.fillStyle = 'rgba(178,30,30,.92)';
+   ctx.fillRect(0, 0, W, 34*s);
+   ctx.fillStyle = '#fff';
+   ctx.font = font(18, 700);
+   ctx.textAlign = 'center';
+   ctx.fillText('演示样例 · 非真实交易', W / 2, 24*s);
+ }
+
+ // 底部永久演示标识
+ ctx.fillStyle = '#a0a0a0';
+ ctx.font = font(20);
+ ctx.textAlign = 'center';
+ ctx.fillText(' ', W / 2, H - 8*s);
+}
+
+fields.forEach(id=>$(id).addEventListener('input',draw));
+$('generateNumber').addEventListener('click',generateDemoNumber);
+
+function loadFile(file){
+ if(!file||!file.type.startsWith('image/'))return;
+ const url=URL.createObjectURL(file),img=new Image();
+ img.onload=()=>{imported=img;sourceName=file.name;draw();URL.revokeObjectURL(url)};
+ img.src=url;
+}
+$('file').addEventListener('change',e=>loadFile(e.target.files[0]));
+$('drop').addEventListener('click',e=>{if(e.target.tagName!=='INPUT')$('file').click()});
+$('drop').addEventListener('dragover',e=>{e.preventDefault();$('drop').classList.add('drag')});
+$('drop').addEventListener('dragleave',()=>$('drop').classList.remove('drag'));
+$('drop').addEventListener('drop',e=>{e.preventDefault();$('drop').classList.remove('drag');loadFile(e.dataTransfer.files[0])});
+['removeImage','clear'].forEach(id=>$(id).addEventListener('click',()=>{imported=null;$('file').value='';draw()}));
+$('useTemplate').addEventListener('click',()=>{imported=null;$('file').value='';draw()});
+$('reset').addEventListener('click',()=>{
+ $('amount').value='-5.00';$('merchant').value='扫二-给文';
+ $('status').value='演示样例';$('remark').value='二维码收款';$('method').value='零钱';
+ $('time').value='2026年11月13日 12:04:28';
+ $('footer').value='本图为演示样例，不代表真实交易';$('showWatermark').checked=true;generateDemoNumber();
+});
+$('download').addEventListener('click',()=>{
+ draw();const a=document.createElement('a');a.download='交易详情_演示样例.png';a.href=canvas.toDataURL('image/png');a.click();
+});
+generateDemoNumber();
+</script>
+</body>
+</html>
